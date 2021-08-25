@@ -1,21 +1,59 @@
 import "./App.css";
-import { BrowserRouter, Route, Switch } from "react-router-dom";
-
-import History from "./components/pages/History";
+import { BrowserRouter, Route, Switch,Redirect,useLocation  } from "react-router-dom";
+import AuthUserProvider, { useAuthUser } from './AuthUserContext';
+import Home from "./components/pages/Home";
+import SignIn from "./components/pages/SignIn";
+import SignUp from "./components/pages/SignUp";
+import Search from "./components/pages/Search"
 import Register from "./components/pages/Register";
 import Edit from "./components/pages/Edit";
-import Search from "./components/pages/Search";
+import History from "./components/pages/History";
 
-function App() {
+;
+
+// PrivateRouteの実装
+const PrivateRoute = ({...props}) => {
+  const authUser = useAuthUser()
+  const isAuthenticated = authUser != null
+  if (isAuthenticated) {
+    return <Route {...props}/>
+  }else{
+    console.log(`ログインしてください`)
+    return <Redirect to={{pathname: "/signin", state: { from: props.location?.pathname }}}/> 
+  }
+}
+
+const UnAuthRoute= ({ ...props }) => {
+  const authUser = useAuthUser()
+  const isAuthenticated = authUser != null
+  const { from } = useLocation().state
+
+  if (isAuthenticated) {
+    console.log(`すでにログイン済みです`)
+    return <Redirect to={from ?? "/search"} />
+  } else {
+    return <Route {...props} />
+  }
+}
+
+const App=()=> {
   return (
+    <AuthUserProvider>
     <BrowserRouter>
       <Switch>
-        <Route path="/" component={Search} exact />
-        <Route path="/register" component={Register} exact />
-        <Route path="/edit" component={Edit} exact />
-        <Route path="/history" component={History} exact />
+      <UnAuthRoute  exact path="/" component={Home}/>
+        <UnAuthRoute  exact path="/signin" component={SignIn}/>
+        <UnAuthRoute  exact path="/signup" component={SignUp}/>
+   
+       <PrivateRoute path="/search" component={Search} exact />
+        <PrivateRoute path="/register" component={Register} exact />
+        <PrivateRoute path="/edit" component={Edit} exact />
+        <PrivateRoute path="/history" component={History} exact />
       </Switch>
     </BrowserRouter>
+  </AuthUserProvider>
+
+
   );
 }
 

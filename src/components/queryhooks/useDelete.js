@@ -1,27 +1,27 @@
 import { useState, useEffect } from "react";
-import { getData } from "../modules/myapi";
+import { postData } from "../modules/myapi";
 
-export const useGetData = () => {
+export const usePostData = () => {
   const [data, setData] = useState([]);
-  const [condition, setCondition] = useState({ type: "", id: "" });
+  const [condition, setCondition] = useState({ type: "", data: {} });
   const [isLoading, setIsLoading] = useState(false);
   const [isError, setIsError] = useState(false);
 
   useEffect(() => {
-    const getDatas = async () => {
+    const selectDatas = async () => {
       setIsError(false);
       setIsLoading(true);
-      getData(condition)
+      postData(condition)
         .then((res) => {
           setData(res.data);
         })
         .catch(setIsError(true));
       setIsLoading(false);
     };
-    getDatas();
+    selectDatas();
   }, [condition]);
 
   return [{ data, isLoading, isError }, setCondition];
 };
 
-export default useGetData;
+export default usePostData;
