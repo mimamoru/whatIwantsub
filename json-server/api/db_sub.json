@@ -4,19 +4,31 @@
       "id": "U001",
       "name": "tisc1",
       "mail": "abc@gmail.com",
-      "password": "pass@123"
+      "password": "pass@123",
+      "record": {
+        "createDate": "2020-11-5",
+        "recordDate": "2020-12-5"
+      }
     },
     {
       "id": "U002",
       "name": "tisc2",
       "mail": "def@gmail.com",
-      "password": "pass@234"
+      "password": "pass@234",
+      "record": {
+        "createDate": "2020-11-5",
+        "recordDate": "2020-12-5"
+      }
     },
     {
       "id": "U003",
       "name": "tisc3",
       "mail": "ghi@gmail.com",
-      "password": "pass@345"
+      "password": "pass@345",
+      "record": {
+        "createDate": "2020-11-5",
+        "recordDate": "2020-12-5"
+      }
     }
   ],
   "items": [

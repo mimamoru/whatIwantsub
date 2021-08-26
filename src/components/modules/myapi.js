@@ -19,20 +19,20 @@ export const getUrl = (type) => {
   }
 };
 
-//ローカルサーバーから値を取得する
+//ローカルサーバーからid指定で値を取得する
 export const getData = async (type, id = "") => {
   const url = getUrl(type);
-  const path = id === "" ? url : `${url}/${id}`;
-  const { data } = await axios.get(path);
+  //const path = id === "" ? url : `${url}/${id}`;
+  const { data } = await axios.get(`${url}/${id}`);
   return data;
 };
 
 //ローカルサーバーから条件指定で値を取得する
-export const getConditionData = async (condition) => {
-  const url = getUrl(condition.type);
+export const selectDatas = async (type = "", param ="" ) => {
+  const url = getUrl(type);
   //`${url}?_page=${page}&_limit=10`;
   //?title=json-server&author=typicode
-  const path = `${url}?${condition.param}`;
+  const path = `${url}?${param}`;
   const { data } = await axios.get(path);
   return data;
 };

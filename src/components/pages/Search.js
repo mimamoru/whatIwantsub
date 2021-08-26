@@ -1,6 +1,7 @@
 import React from "react";
 
-import { useState, useRef } from "react";
+import  { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useRef ,} from "react";
 import { useForm, Controller } from "react-hook-form";
 import ReactSelect from "react-select";
 import { useLocation, useHistory } from "react-router-dom";
@@ -29,13 +30,28 @@ import clsx from "clsx";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { BaseYup } from "../modules/localeJP";
 
-import GenericTemplate from "../modules/GenericTemplate";
+
+import Chip from "@material-ui/core/Chip";
+import Paper from "@material-ui/core/Paper";
+
+import SearchIcon from "@material-ui/icons/Search";
+import CheckCircleOutlineRoundedIcon from "@material-ui/icons/CheckCircleOutlineRounded";
+
+import CustomizedSnackbars from "../atoms/CustomizedSnackbars";
+import ConfirmDialog from "../atoms/ConfirmDialog";
+import GenericTemplate from "../molecules/GenericTemplate";
+import TagsPapers from "../molecules/TagsPapers";
 import {
   readItemData,
   updateItemData,
   readCompareData,
   deleteItemData,
 } from "../modules/dataManage";
+import {
+  useSelectDatas,
+  usePutData,
+  useDeleteData,
+} from "../queryhooks";
 import {
   nodata,
   error,
@@ -78,14 +94,7 @@ const useStyles = makeStyles((theme) => ({
       margin: theme.spacing(3),
     },
   },
-  card: {
-    display: "inline-block",
-    position: "relative",
-  },
-  collapse: {
-    //position:"absolute",
-    //top:250,
-  },
+ 
   button: {
     margin: theme.spacing(0.5),
   },
@@ -97,9 +106,7 @@ const useStyles = makeStyles((theme) => ({
       duration: theme.transitions.duration.shortest,
     }),
   },
-  expandOpen: {
-    transform: "rotate(180deg)",
-  },
+ 
   avatar: {
     width: "7ch",
     backgroundColor: blue[500],
@@ -169,26 +176,26 @@ const Search = () => {
   //単価(検索結果)の状態
   const inputCostRef = useRef([]);
 
-  //スナックバー表示状態
-  const [open, setOpen] = useState(false);
-  //スナックバー内容状態
-  const [snackbar, setSnackbar] = useState({ message: "", color: "" });
-  //スナックバーを閉じる処理
-  const handleClose = (event, reason) => {
-    if (reason === "clickaway") {
-      return;
-    }
-    setOpen(false);
-  };
-  function Alert(props) {
-    return <MuiAlert elevation={6} variant="filled" {...props} />;
-  }
+   //確認ダイアログメッセージののメッセージの状態管理
+   const [confDlg, setConfDlg] = useState("");
 
-  //スナックバー表示処理
-  const handleSnackbar = (message, color) => {
-    setSnackbar({ message: message, color: color });
-    setOpen(true);
-  };
+   //スナックバーの状態管理
+   const [snackbar, setSnackbar] = useState({
+     open: false,
+     severity: "",
+     message: "",
+   });
+ 
+   //スナックバーを閉じる処理
+   const handleClose = useCallback(
+     (event, reason) => {
+       if (reason === "clickaway") {
+         return;
+       }
+       setSnackbar({ ...snackbar, open: false });
+     },
+     [snackbar]
+   );
 
   //金額範囲逆転チェック
   const getData = async (data) => {
@@ -197,7 +204,7 @@ const Search = () => {
       data.maxBudget !== null &&
       data.minBudget > data.maxBudget
     ) {
-      handleSnackbar(reverse, "error");
+      setSnackbar({ open: true, severity: "error", message: err });
     } else {
       return await fetchItemData(data);
     }

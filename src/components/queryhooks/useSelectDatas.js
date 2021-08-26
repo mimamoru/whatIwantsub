@@ -1,25 +1,29 @@
 import { useState, useEffect } from "react";
-import { getConditionData } from "../modules/myapi";
+import { selectDatas } from "../modules/myapi";
+import { useAuthUser } from "./AuthUserContext";
 
 export const useSelectDatas = () => {
+  const authUser = useAuthUser();
   const [data, setData] = useState([]);
   const [condition, setCondition] = useState({ type: "", param: "" });
   const [isLoading, setIsLoading] = useState(false);
   const [isError, setIsError] = useState(false);
 
   useEffect(() => {
-    const selectDatas = async () => {
+    const select = async () => {
       setIsError(false);
       setIsLoading(true);
-      getConditionData(condition)
+      const { type, param } = condition;
+
+      selectDatas(type, `userId=${authUser}&${param}`)
         .then((res) => {
           setData(res.data);
         })
-        .catch(setIsError(true));
+        .catch((err) => setIsError(err.response.status));
       setIsLoading(false);
     };
-    selectDatas();
-  }, [condition]);
+    select();
+  }, [condition, authUser]);
 
   return [{ data, isLoading, isError }, setCondition];
 };
