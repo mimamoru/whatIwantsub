@@ -15,7 +15,7 @@ export const useSelectDatas = () => {
       setIsLoading(true);
       const { type, param } = condition;
 
-      selectDatas(type, `userId=${authUser}&${param}`)
+      await selectDatas(type, `userId=${authUser}${param}`)
         .then((res) => {
           setData(res.data);
         })

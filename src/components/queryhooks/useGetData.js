@@ -19,7 +19,7 @@ export const useGetData = () => {
         setIsLoading(false);
         return;
       }
-      getData(type, id)
+      await getData(type, id)
         .then((res) => {
           setData(res.data);
         })

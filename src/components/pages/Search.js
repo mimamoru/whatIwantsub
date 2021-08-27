@@ -1,7 +1,6 @@
 import React from "react";
 
-import  { useState, useEffect, useRef, useCallback } from "react";
-import { useState, useRef ,} from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useForm, Controller } from "react-hook-form";
 import ReactSelect from "react-select";
 import { useLocation, useHistory } from "react-router-dom";
@@ -30,7 +29,6 @@ import clsx from "clsx";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { BaseYup } from "../modules/localeJP";
 
-
 import Chip from "@material-ui/core/Chip";
 import Paper from "@material-ui/core/Paper";
 
@@ -47,14 +45,10 @@ import {
   readCompareData,
   deleteItemData,
 } from "../modules/dataManage";
-import {
-  useSelectDatas,
-  usePutData,
-  useDeleteData,
-} from "../queryhooks";
+import { useSelectDatas, usePutData, useDeleteData } from "../queryhooks";
 import {
   nodata,
-  error,
+  err,
   drop,
   purchase,
   cancel,
@@ -87,6 +81,59 @@ const schema = BaseYup.object().shape({
   keyword: BaseYup.string().max(100).label("キーワード"),
 });
 
+// const conditions = {
+//   itemId: condition.itemId,
+//   itemName: condition.itemName,
+//   minBudget: condition.minBudget || "",
+//   maxBudget: condition.maxBudget || "",
+//   keyword: condition.keyword,
+//   condition: condition.condition,
+//   sortIndex: condition.sortIndex,
+// };
+
+const SelectItems = (
+  items,
+  { itemId, itemName, minBudget, maxBudget, keyword, condition, sortIndex }
+) => {
+  const keywords = keyword ? keyword.split(/\s+/) : "";
+  let result = items
+    .filter((e) => (itemId === "" ? true : e.id === itemId))
+    .filter((e) => (itemName === "" ? true : e.name.indexOf(itemName) !== -1))
+    .filter((e) => (minBudget === "" ? true : e.budget >= +minBudget))
+    .filter((e) => (maxBudget === "" ? true : e.budget <= +maxBudget))
+    .filter((e) => {
+      if (keywords === "") return true;
+      const str = `${e.name},${e.remark}`;
+      if (condition === false) {
+        return keywords.some((key) => str.indexOf(key) !== -1);
+      } else {
+        return keywords.every((key) => str.indexOf(key) !== -1);
+      }
+    });
+  switch (sortIndex.value) {
+    case "budget":
+      result = result.sort((a, b) => (a.budget < b.budget ? -1 : 1));
+      break;
+    case "level":
+      result = result.sort((a, b) => (a.level > b.level ? -1 : 1));
+      break;
+    case "limit":
+      result = result.sort((a, b) => (a.limit < b.limit ? -1 : 1));
+      break;
+    default:
+      result = result.sort((a, b) => (a.id > b.id ? -1 : 1));
+  }
+  return result;
+};
+
+const selectCompares = (compares, itemId) => {
+  const arr = [];
+  compares
+    .filter((e) => itemId === e.compare[0] || itemId === e.compare[1])
+    .forEach((e) => arr.push(...e.compare));
+  return [...new Set(arr.filter((e) => e !== itemId))].sort();
+};
+
 //スタイルの指定
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -94,7 +141,7 @@ const useStyles = makeStyles((theme) => ({
       margin: theme.spacing(3),
     },
   },
- 
+
   button: {
     margin: theme.spacing(0.5),
   },
@@ -106,7 +153,7 @@ const useStyles = makeStyles((theme) => ({
       duration: theme.transitions.duration.shortest,
     }),
   },
- 
+
   avatar: {
     width: "7ch",
     backgroundColor: blue[500],
@@ -138,19 +185,35 @@ const handleChange = (id) => {
   }
 };
 
-//比較情報取得
-const fetchCompareData = async (item) => {
-  let response;
-  await readCompareData(item).then((res) => {
-    response = res;
-  });
-  return response;
-};
-
 const Search = () => {
   const classes = useStyles();
   const history = useHistory();
   const location = useLocation();
+
+  //商品情報取得hook
+  const [{ data: items, isLoading, isError: itErr }, setItCondition] =
+    useSelectDatas();
+  //比較情報取得hook
+  const [{ data: compares, isError: cpErr }, setCpCondition] = useSelectDatas();
+
+  //商品情報取得
+  useEffect(() => {
+    const fetch = () => {
+      setItCondition({
+        type: "item",
+        param: "&delete=false&record.decideDate=null",
+      });
+    };
+    fetch();
+  }, [setItCondition]);
+
+  //比較情報取得
+  useEffect(() => {
+    const fetch = () => {
+      setCpCondition({ type: "compare" });
+    };
+    fetch();
+  }, [setCpCondition]);
 
   //遷移パラメータの取得
   const paramCondition = location.state
@@ -176,37 +239,75 @@ const Search = () => {
   //単価(検索結果)の状態
   const inputCostRef = useRef([]);
 
-   //確認ダイアログメッセージののメッセージの状態管理
-   const [confDlg, setConfDlg] = useState("");
+  //確認ダイアログメッセージののメッセージの状態管理
+  const [confDlg, setConfDlg] = useState("");
 
-   //スナックバーの状態管理
-   const [snackbar, setSnackbar] = useState({
-     open: false,
-     severity: "",
-     message: "",
-   });
- 
-   //スナックバーを閉じる処理
-   const handleClose = useCallback(
-     (event, reason) => {
-       if (reason === "clickaway") {
-         return;
-       }
-       setSnackbar({ ...snackbar, open: false });
-     },
-     [snackbar]
-   );
+  //スナックバーの状態管理
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    severity: "",
+    message: "",
+  });
+
+  //スナックバーを閉じる処理
+  const handleClose = useCallback(
+    (event, reason) => {
+      if (reason === "clickaway") {
+        return;
+      }
+      setSnackbar({ ...snackbar, open: false });
+    },
+    [snackbar]
+  );
 
   //金額範囲逆転チェック
-  const getData = async (data) => {
+  const getData = (condition) => {
     if (
-      data.minBudget !== null &&
-      data.maxBudget !== null &&
-      data.minBudget > data.maxBudget
+      condition.minBudget !== null &&
+      condition.maxBudget !== null &&
+      condition.minBudget > condition.maxBudget
     ) {
-      setSnackbar({ open: true, severity: "error", message: err });
+      setSnackbar({ open: true, severity: "error", message: reverse });
     } else {
-      return await fetchItemData(data);
+      //検索条件
+      const conditions = {
+        itemId: condition.itemId,
+        itemName: condition.itemName,
+        minBudget: condition.minBudget || "",
+        maxBudget: condition.maxBudget || "",
+        keyword: condition.keyword,
+        condition: condition.condition,
+        sortIndex: condition.sortIndex,
+      };
+      setAllCondition({ ...conditions });
+      if (itErr) {
+        setSnackbar({ open: true, severity: "error", message: err });
+        return;
+      }
+      const result = SelectItems(items, conditions);
+      const length = result.length;
+      if (length === 0) {
+        setSnackbar({ open: true, severity: "warning", message: nodata });
+      }
+      const expand = {};
+      //商品情報取得できた場合、それぞれの商品に対する詳細情報の設定をする
+      if (cpErr) {
+        setSnackbar({ open: true, severity: "error", message: err });
+        return;
+      }
+      for (let i = 0; i < length; i++) {
+        const res = result[i];
+        const compares = selectCompares(res.id);
+        res.compares = compares.join(",");
+        expand[res.id] = false;
+        const qtyDom = document.getElementById(`${res.id}_qtyInput`);
+        if (qtyDom !== null) qtyDom.value = 1;
+        const costDom = document.getElementById(`${res.id}_costInput`);
+        if (costDom !== null) costDom.value = +res.budget;
+      }
+      setResultData([...result]);
+      setExpanded({ ...expand });
+      handleChange();
     }
   };
 
@@ -217,68 +318,6 @@ const Search = () => {
     const tmp = expanded;
     tmp[id] = !expanded[id];
     setExpanded({ ...tmp });
-  };
-
-  //検索結果表示用の情報取得
-  const fetchItemData = async (data) => {
-    let response;
-    //検索条件
-    const conditions = {
-      itemId: data.itemId,
-      itemName: data.itemName,
-      minBudget: data.minBudget || "",
-      maxBudget: data.maxBudget || "",
-      keyword: data.keyword,
-      condition: data.condition,
-      sortIndex: data.sortIndex,
-    };
-    setAllCondition({ ...conditions });
-    //商品情報取得
-    await readItemData(
-      false,
-      data.itemId,
-      data.itemName,
-      data.minBudget || "",
-      data.maxBudget || "",
-      data.keyword,
-      data.condition,
-      data.sortIndex
-    ).then((res) => {
-      if (res === "error") {
-        handleSnackbar(error, "error");
-        return;
-      }
-      response = res;
-    });
-    if (!response) return;
-    //商品情報検索結果が0件の場合、警告を表示
-    const length = response.length;
-    if (length === 0) {
-      handleSnackbar(nodata, "warning");
-    }
-    const expand = {};
-    //商品情報取得できた場合、それぞれの商品に対する詳細情報の設定をする
-    for (let i = 0; i < response.length; i++) {
-      const res = response[i];
-      let compares;
-      await fetchCompareData(res.id).then((res) => {
-        if (res === "error") {
-          handleSnackbar(error, "error");
-          return;
-        }
-        compares = res;
-      });
-      if (!compares) return;
-      res.compares = compares.join(",");
-      expand[res.id] = false;
-      const qtyDom = document.getElementById(`${res.id}_qtyInput`);
-      if (qtyDom !== null) qtyDom.value = 1;
-      const costDom = document.getElementById(`${res.id}_costInput`);
-      if (costDom !== null) costDom.value = +res.budget;
-    }
-    setResultData([...response]);
-    setExpanded({ ...expand });
-    handleChange();
   };
 
   //検索条件クリア処理

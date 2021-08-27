@@ -16,14 +16,15 @@ export const usePutData = () => {
       if (type !== "compare") {
         data.record.recordDate = getCurrentDate;
       }
-      putData(type, data.id,data)
-        .catch((err) => setIsError(err.response.status));
+      await putData(type, data.id, data).catch((err) =>
+        setIsError(err.response.status)
+      );
       setIsLoading(false);
     };
     put();
   }, [condition, authUser]);
 
-  return [{isLoading, isError }, setCondition];
+  return [{ isLoading, isError }, setCondition];
 };
 
 export default usePutData;

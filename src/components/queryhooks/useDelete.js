@@ -18,7 +18,9 @@ export const useDeleteData = () => {
         setIsLoading(false);
         return;
       }
-      deleteData(type, id).catch((err) => setIsError(err.response.status));
+      await deleteData(type, id).catch((err) =>
+        setIsError(err.response.status)
+      );
       setIsLoading(false);
     };
     del();

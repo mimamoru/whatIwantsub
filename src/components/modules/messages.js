@@ -1,5 +1,5 @@
 export const success = "成功しました";
-export const error = "エラーが発生しました";
+export const err = "エラーが発生しました";
 export const edit = "編集しました";
 export const register = "登録しました";
 export const drop = "削除しました";

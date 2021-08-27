@@ -18,7 +18,9 @@ export const usePostData = () => {
         data.record.recordDate = getCurrentDate;
       }
       if (type !== "user") data.userId = authUser;
-      postData(type, data).catch((err) => setIsError(err.response.status));
+      await postData(type, data).catch((err) =>
+        setIsError(err.response.status)
+      );
       setIsLoading(false);
     };
     post();
