@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { postData, getCurrentDate, selectDatas } from "../modules/myapi";
-import { useAuthUser } from "./AuthUserContext";
+import { useAuthUser } from "../../context/AuthUserContext";
 
 export const usePostData = () => {
   const authUser = useAuthUser();

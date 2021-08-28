@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { putData, getCurrentDate, getData } from "../modules/myapi";
-import { useAuthUser } from "./AuthUserContext";
+import { useAuthUser } from "../../context/AuthUserContext";
 
 export const usePutData = () => {
   const authUser = useAuthUser();

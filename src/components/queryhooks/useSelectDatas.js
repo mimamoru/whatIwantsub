@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { selectDatas } from "../modules/myapi";
-import { useAuthUser } from "./AuthUserContext";
+import { useAuthUser } from "../../context/AuthUserContext";
 
 export const useSelectDatas = () => {
   const authUser = useAuthUser();

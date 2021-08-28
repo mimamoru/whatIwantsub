@@ -1,4 +1,4 @@
-import { React, useState, useEffect, useCallback } from "react";
+import { React, useState, useEffect, useCallback,useContext } from "react";
 import GenericTemplate from "../modules/GenericTemplate";
 import { makeStyles } from "@material-ui/core/styles";
 import { DataGrid } from "@material-ui/data-grid";
@@ -13,6 +13,7 @@ import BlockOutlinedIcon from "@material-ui/icons/BlockOutlined";
 import ReactSelect from "react-select";
 import { err } from "../modules/messages";
 import { useSelectDatas, getCurrentDate } from "../queryhooks";
+import { UserItemsContext } from "../../context/UserItemsContext";
 const useStyles = makeStyles((theme) => ({
   absolute: {
     position: "absolute",
@@ -76,23 +77,24 @@ const History = () => {
   const [cancelHistory, setCancelHistory] = useState([]);
   const [buyHistoryRows, setBuyHistoryRows] = useState([]);
   const [cancelHistoryRows, setCancelHistoryRows] = useState([]);
+  const { items, itsLoaging, itsErr, setReroadItems } =
+    useContext(UserItemsContext);
+  // //商品情報取得hook(複数)
+  // const [
+  //   { data: items, isLoading: itsLoaging, isError: itsErr },
+  //   setItCondition,
+  // ] = useSelectDatas();
 
-  //商品情報取得hook(複数)
-  const [
-    { data: items, isLoading: itsLoaging, isError: itsErr },
-    setItCondition,
-  ] = useSelectDatas();
-
-  //商品情報取得(複数)
-  useEffect(() => {
-    const fetch = () => {
-      setItCondition({
-        type: "item",
-        param: "&delete=false&record.decideDate=null",
-      });
-    };
-    fetch();
-  }, [setItCondition]);
+  // //商品情報取得(複数)
+  // useEffect(() => {
+  //   const fetch = () => {
+  //     setItCondition({
+  //       type: "item",
+  //       param: "&delete=false&record.decideDate=null",
+  //     });
+  //   };
+  //   fetch();
+  // }, [setItCondition]);
 
   //スナックバーの状態管理
   const [snackbar, setSnackbar] = useState({
@@ -116,10 +118,7 @@ const History = () => {
     const fetchData = () => {
       if (itsLoaging) return;
       if (itsErr) {
-        setItCondition({
-          type: "item",
-          param: "&delete=false&record.decideDate=null",
-        });
+        setReroadItems(true);
         setSnackbar({ open: true, severity: "error", message: err });
         return;
       }
@@ -153,7 +152,7 @@ const History = () => {
       }
     };
     fetchData();
-  }, [tabValue, items, itsErr, itsLoaging, setItCondition]);
+  }, [tabValue, items, itsErr, itsLoaging, setReroadItems]);
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);

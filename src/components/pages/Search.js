@@ -1,10 +1,10 @@
 import React from "react";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useContext, useCallback } from "react";
 import { useForm, Controller } from "react-hook-form";
 import ReactSelect from "react-select";
 import { useLocation, useHistory } from "react-router-dom";
-
+import { UserItemsContext } from "../../context/UserItemsContext";
 import { makeStyles } from "@material-ui/core/styles";
 
 import Button from "@material-ui/core/Button";
@@ -55,6 +55,7 @@ const SelectItems = (
 ) => {
   const keywords = keyword ? keyword.split(/\s+/) : "";
   let result = items
+    .filter((e) => e.record?.decideDate === null)
     .filter((e) => (itemId === "" ? true : e.id === itemId))
     .filter((e) => (itemName === "" ? true : e.name.indexOf(itemName) !== -1))
     .filter((e) => (minBudget === "" ? true : e.budget >= +minBudget))
@@ -129,24 +130,26 @@ const Search = () => {
   const location = useLocation();
   const [actionErr, setActionErr] = useState(true);
 
-  //商品情報取得hook(複数)
-  const [
-    { data: items, isLoading: itsLoaging, isError: itsErr },
-    setItCondition,
-  ] = useSelectDatas();
+  const { items, itsLoaging, itsErr, setReroadItems } =
+    useContext(UserItemsContext);
+  // //商品情報取得hook(複数)
+  // const [
+  //   { data: items, isLoading: itsLoaging, isError: itsErr },
+  //   setItCondition,
+  // ] = useSelectDatas();
 
-  //商品情報取得(複数)
-  useEffect(() => {
-    if (!actionErr) return;
-    const fetch = () => {
-      setItCondition({
-        type: "item",
-        param: "&delete=false&record.decideDate=null",
-      });
-      setActionErr(false);
-    };
-    fetch();
-  }, [setItCondition, actionErr]);
+  // //商品情報取得(複数)
+  // useEffect(() => {
+  //   if (!actionErr) return;
+  //   const fetch = () => {
+  //     setItCondition({
+  //       type: "item",
+  //       param: "&delete=false&record.decideDate=null",
+  //     });
+  //     setActionErr(false);
+  //   };
+  //   fetch();
+  // }, [setItCondition, actionErr]);
 
   //遷移パラメータの取得
   const paramCondition = location.state
@@ -204,6 +207,7 @@ const Search = () => {
       };
       setAllCondition({ ...conditions });
       if (itsErr) {
+        setReroadItems(true);
         setSnackbar({ open: true, severity: "error", message: err });
         return;
       }

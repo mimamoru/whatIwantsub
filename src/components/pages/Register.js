@@ -1,4 +1,4 @@
-import { React, useState, useEffect, useCallback } from "react";
+import { React, useState, useEffect, useCallback, useContext } from "react";
 
 import { useForm, Controller } from "react-hook-form";
 
@@ -7,7 +7,7 @@ import ReactSelect from "react-select";
 import Button from "@material-ui/core/Button";
 import TextField from "@material-ui/core/TextField";
 import Slider from "@material-ui/core/Slider";
-
+import { UserItemsContext } from "../../context/UserItemsContext";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { BaseYup } from "../modules/localeJP";
 import CustomizedSnackbars from "../atoms/CustomizedSnackbars";
@@ -104,22 +104,24 @@ const Register = () => {
   const [{ isLoading: itPLoaging, isError: itPErr }, setItData] = usePostData();
   //比較情報登録hook
   const [{ isLoading: cpPLoaging, isError: cPErr }, setCpData] = usePostData();
-  //商品情報取得hook(複数)
-  const [
-    { data: items, isLoading: itsLoaging, isError: itsErr },
-    setItCondition,
-  ] = useSelectDatas();
+  const { items, itsLoaging, itsErr, setReroadItems } =
+    useContext(UserItemsContext);
+  // //商品情報取得hook(複数)
+  // const [
+  //   { data: items, isLoading: itsLoaging, isError: itsErr },
+  //   setItCondition,
+  // ] = useSelectDatas();
 
-  //商品情報取得(複数)
-  useEffect(() => {
-    const fetch = () => {
-      setItCondition({
-        type: "item",
-        param: "&delete=false&record.decideDate=null",
-      });
-    };
-    fetch();
-  }, [setItCondition]);
+  // //商品情報取得(複数)
+  // useEffect(() => {
+  //   const fetch = () => {
+  //     setItCondition({
+  //       type: "item",
+  //       param: "&delete=false&record.decideDate=null",
+  //     });
+  //   };
+  //   fetch();
+  // }, [setItCondition]);
   //スナックバーの状態管理
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -144,19 +146,18 @@ const Register = () => {
   useEffect(() => {
     if (itsLoaging) return;
     if (itsErr) {
-      setItCondition({
-        type: "item",
-        param: "&delete=false&record.decideDate=null",
-      });
+      setReroadItems(true);
       setSnackbar({ open: true, severity: "error", message: err });
       return;
     }
-    const option = items.map((e) => ({
-      value: e.id,
-      label: `${e.id}:${e.name}`,
-    }));
+    const option = items
+      .filter((e) => e.record?.decideDate === null)
+      .map((e) => ({
+        value: e.id,
+        label: `${e.id}:${e.name}`,
+      }));
     setOptions(...option);
-  }, [itsLoaging, itsErr, setItCondition, items]);
+  }, [itsLoaging, itsErr, setReroadItems, items]);
 
   //登録処理
   async function handleRegister(data) {

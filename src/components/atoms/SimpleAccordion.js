@@ -1,4 +1,11 @@
-import { useState, memo, useEffect, useRef, useCallback } from "react";
+import {
+  useState,
+  memo,
+  useEffect,
+  useRef,
+  useCallback,
+  useContext,
+} from "react";
 
 import { makeStyles } from "@material-ui/core/styles";
 import Accordion from "@material-ui/core/Accordion";
@@ -22,7 +29,7 @@ import ConfirmDialog from "../atoms/ConfirmDialog";
 import CustomizedSnackbars from "../atoms/CustomizedSnackbars";
 import { BaseYup } from "../modules/localeJP";
 import CircularIndeterminate from "../atoms/CircularIndeterminate";
-
+import { UserComparesContext } from "../../context/UserComparesContext";
 import { useHistory } from "react-router-dom";
 import { useSelectDatas, usePutData, useDeleteData } from "../queryhooks";
 import {
@@ -35,6 +42,7 @@ import {
   confirmPurchase,
   confirmCancel,
 } from "../modules/messages";
+import TouchRipple from "@material-ui/core/ButtonBase/TouchRipple";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -90,7 +98,7 @@ const handleChange = (id) => {
     );
   }
 };
-//MyTag設定画面のタグ情報表示用パネル
+//情報表示用パネル
 const SimpleAccordion = memo(({ elm, allCondition, setActionErr }) => {
   const history = useHistory();
   //商品情報取得hook(1件)
@@ -102,14 +110,16 @@ const SimpleAccordion = memo(({ elm, allCondition, setActionErr }) => {
   const [{ isLoading: itDLoaging, isError: itDErr }, setItDId] =
     useDeleteData();
   //比較情報取得hook
-  const [{ data: compares, isError: cpErr }, setCpCondition] = useSelectDatas();
-  //比較情報取得
-  useEffect(() => {
-    const fetch = () => {
-      setCpCondition({ type: "compare" });
-    };
-    fetch();
-  }, [setCpCondition]);
+  const { compares, cpLoaging, cpErr, setReroadCompares } =
+    useContext(UserComparesContext);
+  // const [{ data: compares, isError: cpErr }, setCpCondition] = useSelectDatas();
+  // //比較情報取得
+  // useEffect(() => {
+  //   const fetch = () => {
+  //     setCpCondition({ type: "compare" });
+  //   };
+  //   fetch();
+  // }, [setCpCondition]);
   const classes = useStyles();
   //数量(検索結果)の状態
   const inputQtyRef = useRef(null);
@@ -157,7 +167,7 @@ const SimpleAccordion = memo(({ elm, allCondition, setActionErr }) => {
     }
 
     //最新の比較情報を取得
-    setCpCondition({ type: "compare" });
+    setReroadCompares(true);
     if (cpErr) {
       setSnackbar({ open: true, severity: "error", message: err });
       return;

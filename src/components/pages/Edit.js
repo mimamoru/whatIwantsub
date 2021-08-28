@@ -1,7 +1,8 @@
-import { React, useState, useEffect, useCallback } from "react";
+import { React, useState, useEffect, useCallback, useContext } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { useLocation, useHistory } from "react-router-dom";
 import ReactSelect from "react-select";
+import { UserItemsContext } from "../../context/UserItemsContext";
 
 import Button from "@material-ui/core/Button";
 import TextField from "@material-ui/core/TextField";
@@ -106,12 +107,14 @@ const Edit = () => {
   //遷移パラメータの取得
   const condition = location.state.condition;
   const itemInfo = location.state.itemInfo;
-
-  //商品情報取得hook(複数)
-  const [
-    { data: items, isLoading: itsLoaging, isError: itsErr },
-    setItCondition,
-  ] = useSelectDatas();
+  //const items = useUserItems();
+  const { items, itsLoaging, itsErr, setReroadItems } =
+    useContext(UserItemsContext);
+  // //商品情報取得hook(複数)
+  // const [
+  //   { data: items, isLoading: itsLoaging, isError: itsErr },
+  //   setItCondition,
+  // ] = useSelectDatas();
   //商品更新hook
   const [{ isLoading: itPLoaging, isError: itPErr }, setItData] = usePutData();
   //比較情報登録hook
@@ -165,19 +168,18 @@ const Edit = () => {
   useEffect(() => {
     if (itsLoaging) return;
     if (itsErr) {
-      setItCondition({
-        type: "item",
-        param: "&delete=false&record.decideDate=null",
-      });
+      setReroadItems(true);
       setSnackbar({ open: true, severity: "error", message: err });
       return;
     }
-    const option = items.map((e) => ({
-      value: e.id,
-      label: `${e.id}:${e.name}`,
-    }));
+    const option = items
+      .filter((e) => e.record?.decideDate === null)
+      .map((e) => ({
+        value: e.id,
+        label: `${e.id}:${e.name}`,
+      }));
     setOptions(...option);
-  }, [itsLoaging, itsErr, setItCondition, items]);
+  }, [items, itsErr, itsLoaging, setReroadItems]);
 
   const _sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const handleBack = () => {
