@@ -1,4 +1,4 @@
-import { React, useState, useEffect } from "react";
+import { React, useState, useEffect, useCallback } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { useLocation, useHistory } from "react-router-dom";
 import ReactSelect from "react-select";
@@ -6,21 +6,22 @@ import ReactSelect from "react-select";
 import Button from "@material-ui/core/Button";
 import TextField from "@material-ui/core/TextField";
 import Slider from "@material-ui/core/Slider";
-import Snackbar from "@material-ui/core/Snackbar";
-import MuiAlert from "@material-ui/lab/Alert";
+import CustomizedSnackbars from "../atoms/CustomizedSnackbars";
 
+import CircularIndeterminate from "../atoms/CircularIndeterminate";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { BaseYup } from "../modules/localeJP";
 
 import GenericTemplate from "../modules/GenericTemplate";
+
 import {
-  readItemData,
-  deleteCompareData,
-  updateItemData,
-  addCompareData,
+  useSelectDatas,
+  useDeleteData,
+  usePostData,
+  usePutData,
   getCurrentDate,
-} from "../modules/dataManage";
-import { error, edit, change } from "../modules/messages";
+} from "../queryhooks";
+import { err, edit, change } from "../modules/messages";
 
 //バリデーションの指定
 const schema = BaseYup.object().shape({
@@ -52,10 +53,9 @@ const valuetext = (value) => {
   return `${value}%`;
 };
 
-//更新処理
-const fetchPost = async (id, data) => {
-  let response;
-  const itemInfo = {
+//更新データ
+const putData = (id, data, compares) => {
+  const putItemData = {
     id: id,
     name: data.itemName,
     budget: data.budget,
@@ -72,29 +72,33 @@ const fetchPost = async (id, data) => {
       recordDate: data.record.recordDate,
     },
   };
-  let items = [];
+  let nexts = [];
   data.compares &&
     data.compares.forEach((e) => {
-      e && items.push(e.value);
+      e && nexts.push(e.value);
     });
-  items = items.sort();
-  //商品情報更新
-  await updateItemData(itemInfo).then((res) => {
-    response = res;
-  });
-  if (response === "error" || response === "warning") return response;
-  //比較情報削除
-  await deleteCompareData(id).then((res) => {
-    response = res;
-  });
-  if (response === "error") return response;
-  //比較情報登録
-  await addCompareData(id, ...items).then((res) => {
-    response = res;
-  });
-  if (response === "error") return response;
-};
+  nexts = nexts.sort();
 
+  let olds = [];
+  compares &&
+    compares.forEach((e) => {
+      e && olds.push(e.value);
+    });
+  olds = olds.sort();
+
+  const postCompareData = nexts
+    .filter((e) => !olds.includes(e))
+    .map((e) => [e, id].sort());
+  const deleteCompareData = olds
+    .filter((e) => !nexts.includes(e))
+    .map((e) => [e, id].sort());
+
+  return {
+    putItemData: putItemData,
+    postCompareData: postCompareData,
+    deleteCompareData: deleteCompareData,
+  };
+};
 const Edit = () => {
   const history = useHistory();
   const location = useLocation();
@@ -102,6 +106,20 @@ const Edit = () => {
   //遷移パラメータの取得
   const condition = location.state.condition;
   const itemInfo = location.state.itemInfo;
+
+  //商品情報取得hook(複数)
+  const [
+    { data: items, isLoading: itsLoaging, isError: itsErr },
+    setItCondition,
+  ] = useSelectDatas();
+  //商品更新hook
+  const [{ isLoading: itPLoaging, isError: itPErr }, setItData] = usePutData();
+  //比較情報登録hook
+  const [{ isLoading: cpPLoaging, isError: cpPErr }, setCpPData] =
+    usePostData();
+  //比較情報削除hook
+  const [{ isLoading: cpDLoaging, isError: cpDErr }, setCpDData] =
+    useDeleteData();
 
   //FORMデフォルト値の指定
   const defaultValues = {
@@ -124,49 +142,43 @@ const Edit = () => {
     resolver: yupResolver(schema),
   });
 
-  //スナックバー表示状態
-  const [open, setOpen] = useState(false);
-  //スナックバー内容状態
-  const [snackbar, setSnackbar] = useState({ message: "", color: "" });
-  //スナックバーを閉じる処理
-  const handleClose = (event, reason) => {
-    if (reason === "clickaway") {
-      return;
-    }
-    setOpen(false);
-  };
-  function Alert(props) {
-    return <MuiAlert elevation={6} variant="filled" {...props} />;
-  }
-  //スナックバー表示処理
-  const handleSnackbar = (message, color) => {
-    setSnackbar({ message: message, color: color });
-    setOpen(true);
-  };
+  //スナックバーの状態管理
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    severity: "",
+    message: "",
+  });
 
+  //スナックバーを閉じる処理
+  const handleClose = useCallback(
+    (event, reason) => {
+      if (reason === "clickaway") {
+        return;
+      }
+      setSnackbar({ ...snackbar, open: false });
+    },
+    [snackbar]
+  );
   //セレクトボックスのプルダウンメニュー管理
   const [options, setOptions] = useState([]);
   //セレクトボックスのプルダウンメニューを設定
   useEffect(() => {
-    const fetchItemData = async () => {
-      let response;
-      await readItemData(false).then((res) => {
-        if (res === "error") {
-          return;
-        }
-        response = res;
+    if (itsLoaging) return;
+    if (itsErr) {
+      setItCondition({
+        type: "item",
+        param: "&delete=false&record.decideDate=null",
       });
-      if (!response) return;
-      const options = response
-        .filter((e) => e.id !== itemInfo.id)
-        .map((e) => ({
-          value: e.id,
-          label: `${e.id}:${e.name}`,
-        }));
-      setOptions(options);
-    };
-    fetchItemData();
-  }, [itemInfo.id]);
+      setSnackbar({ open: true, severity: "error", message: err });
+      return;
+    }
+    const option = items.map((e) => ({
+      value: e.id,
+      label: `${e.id}:${e.name}`,
+    }));
+    setOptions(...option);
+  }, [itsLoaging, itsErr, setItCondition, items]);
+
   const _sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const handleBack = () => {
     //検索条件をパラメータとして一覧画面に遷移する
@@ -175,45 +187,60 @@ const Edit = () => {
     });
   };
 
-  //更新処理　結果に応じたスナックバーを表示
+  //更新処理
   //成功の場合、一覧画面に戻る
-  async function handleEdit(id, data) {
-    let editable = false;
-    data.record = { ...itemInfo.record };
-    await fetchPost(id, data).then((res) => {
-      if (res === "error") {
-        handleSnackbar(error, "error");
-      } else if (res === "warning") {
-        handleSnackbar(change, "warning");
+  async function handleEdit(data) {
+    const { putItemData, postCompareData, deleteCompareData } = putData(
+      defaultValues.itemId,
+      data,
+      defaultValues.compares
+    );
+    setItData(...{ type: "item", data: putItemData });
+    if (itPErr) {
+      //商品が更新、削除されていた場合は警告を表示し処理を終了する
+      if (itPErr === "changed") {
+        setSnackbar({ open: true, severity: "warning", message: change });
       } else {
-        handleSnackbar(edit, "success");
-        editable = true;
+        setSnackbar({ open: true, severity: "error", message: err });
+      }
+      return false;
+    }
+    postCompareData.forEach((e) => {
+      setCpPData(...{ type: "compare", data: e });
+      if (cpPErr) {
+        setSnackbar({ open: true, severity: "error", message: err });
+        return;
       }
     });
-    if (!editable) return;
+
+    deleteCompareData.forEach((e) => {
+      setCpDData(...{ type: "compare", param: `&compare=${data}` });
+      if (cpDErr) {
+        setSnackbar({ open: true, severity: "error", message: err });
+        return;
+      }
+    });
+    setSnackbar({ open: true, severity: "success", message: edit });
     await _sleep(2000);
     handleBack();
   }
 
   return (
     <GenericTemplate title="編集">
-      <Snackbar
-        open={open}
-        autoHideDuration={4000}
-        onClose={handleClose}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      >
-        <Alert onClose={handleClose} severity={snackbar.color}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+      <CustomizedSnackbars
+        open={snackbar.open}
+        handleClose={handleClose}
+        severity={snackbar.severity}
+        message={snackbar.message}
+      />
       <form
         style={{ width: 650 }}
-        onSubmit={handleSubmit((data) =>
-          handleEdit(defaultValues.itemId, data)
-        )}
+        onSubmit={handleSubmit((data) => handleEdit(data))}
         className="form"
       >
+        {(itsLoaging || cpDLoaging || cpPLoaging || itPLoaging) && (
+          <CircularIndeterminate component="div" />
+        )}
         <hr />
         <div className="container">
           <section>

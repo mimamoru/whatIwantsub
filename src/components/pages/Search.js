@@ -6,55 +6,23 @@ import ReactSelect from "react-select";
 import { useLocation, useHistory } from "react-router-dom";
 
 import { makeStyles } from "@material-ui/core/styles";
-import Snackbar from "@material-ui/core/Snackbar";
-import MuiAlert from "@material-ui/lab/Alert";
+
 import Button from "@material-ui/core/Button";
 import TextField from "@material-ui/core/TextField";
 import Checkbox from "@material-ui/core/Checkbox";
-import Card from "@material-ui/core/Card";
-import CardHeader from "@material-ui/core/CardHeader";
-import CardContent from "@material-ui/core/CardContent";
-import CardActions from "@material-ui/core/CardActions";
-import Collapse from "@material-ui/core/Collapse";
-import Avatar from "@material-ui/core/Avatar";
-import IconButton from "@material-ui/core/IconButton";
-import Typography from "@material-ui/core/Typography";
-import { blue } from "@material-ui/core/colors";
-import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
-import EditOutlinedIcon from "@material-ui/icons/EditOutlined";
-import DeleteForeverOutlinedIcon from "@material-ui/icons/DeleteForeverOutlined";
 
-import clsx from "clsx";
+import { blue } from "@material-ui/core/colors";
 
 import { yupResolver } from "@hookform/resolvers/yup";
 import { BaseYup } from "../modules/localeJP";
 
-import Chip from "@material-ui/core/Chip";
-import Paper from "@material-ui/core/Paper";
-
-import SearchIcon from "@material-ui/icons/Search";
-import CheckCircleOutlineRoundedIcon from "@material-ui/icons/CheckCircleOutlineRounded";
-
+import CircularIndeterminate from "../atoms/CircularIndeterminate";
+import SimpleAccordion from "../atoms/SimpleAccordion";
 import CustomizedSnackbars from "../atoms/CustomizedSnackbars";
-import ConfirmDialog from "../atoms/ConfirmDialog";
 import GenericTemplate from "../molecules/GenericTemplate";
-import TagsPapers from "../molecules/TagsPapers";
-import {
-  readItemData,
-  updateItemData,
-  readCompareData,
-  deleteItemData,
-} from "../modules/dataManage";
-import { useSelectDatas, usePutData, useDeleteData } from "../queryhooks";
-import {
-  nodata,
-  err,
-  drop,
-  purchase,
-  cancel,
-  reverse,
-  change,
-} from "../modules/messages";
+
+import { useSelectDatas } from "../queryhooks";
+import { nodata, err, reverse } from "../modules/messages";
 
 //バリデーションの指定
 const schema = BaseYup.object().shape({
@@ -80,16 +48,6 @@ const schema = BaseYup.object().shape({
     .label("金額(最大)"),
   keyword: BaseYup.string().max(100).label("キーワード"),
 });
-
-// const conditions = {
-//   itemId: condition.itemId,
-//   itemName: condition.itemName,
-//   minBudget: condition.minBudget || "",
-//   maxBudget: condition.maxBudget || "",
-//   keyword: condition.keyword,
-//   condition: condition.condition,
-//   sortIndex: condition.sortIndex,
-// };
 
 const SelectItems = (
   items,
@@ -124,14 +82,6 @@ const SelectItems = (
       result = result.sort((a, b) => (a.id > b.id ? -1 : 1));
   }
   return result;
-};
-
-const selectCompares = (compares, itemId) => {
-  const arr = [];
-  compares
-    .filter((e) => itemId === e.compare[0] || itemId === e.compare[1])
-    .forEach((e) => arr.push(...e.compare));
-  return [...new Set(arr.filter((e) => e !== itemId))].sort();
 };
 
 //スタイルの指定
@@ -174,46 +124,29 @@ const defaultValues = {
   sortIndex: "id",
 };
 
-//詳細情報エラー表示の削除
-const handleChange = (id) => {
-  if (id) {
-    document.getElementById(id).innerHTML = "";
-  } else {
-    Array.from(document.getElementsByClassName("error")).forEach(
-      (e) => (e.innerHTML = "")
-    );
-  }
-};
-
 const Search = () => {
   const classes = useStyles();
-  const history = useHistory();
   const location = useLocation();
+  const [actionErr, setActionErr] = useState(true);
 
-  //商品情報取得hook
-  const [{ data: items, isLoading, isError: itErr }, setItCondition] =
-    useSelectDatas();
-  //比較情報取得hook
-  const [{ data: compares, isError: cpErr }, setCpCondition] = useSelectDatas();
+  //商品情報取得hook(複数)
+  const [
+    { data: items, isLoading: itsLoaging, isError: itsErr },
+    setItCondition,
+  ] = useSelectDatas();
 
-  //商品情報取得
+  //商品情報取得(複数)
   useEffect(() => {
+    if (!actionErr) return;
     const fetch = () => {
       setItCondition({
         type: "item",
         param: "&delete=false&record.decideDate=null",
       });
+      setActionErr(false);
     };
     fetch();
-  }, [setItCondition]);
-
-  //比較情報取得
-  useEffect(() => {
-    const fetch = () => {
-      setCpCondition({ type: "compare" });
-    };
-    fetch();
-  }, [setCpCondition]);
+  }, [setItCondition, actionErr]);
 
   //遷移パラメータの取得
   const paramCondition = location.state
@@ -221,7 +154,22 @@ const Search = () => {
     : defaultValues;
   //検索条件の管理
   const [allCondition, setAllCondition] = useState({ ...paramCondition });
-
+  //スナックバーの状態管理
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    severity: "",
+    message: "",
+  });
+  //スナックバーを閉じる処理
+  const handleClose = useCallback(
+    (event, reason) => {
+      if (reason === "clickaway") {
+        return;
+      }
+      setSnackbar({ ...snackbar, open: false });
+    },
+    [snackbar]
+  );
   const {
     handleSubmit,
     reset,
@@ -234,31 +182,6 @@ const Search = () => {
 
   //検索結果の状態
   const [resultData, setResultData] = useState([]);
-  //数量(検索結果)の状態
-  const inputQtyRef = useRef([]);
-  //単価(検索結果)の状態
-  const inputCostRef = useRef([]);
-
-  //確認ダイアログメッセージののメッセージの状態管理
-  const [confDlg, setConfDlg] = useState("");
-
-  //スナックバーの状態管理
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    severity: "",
-    message: "",
-  });
-
-  //スナックバーを閉じる処理
-  const handleClose = useCallback(
-    (event, reason) => {
-      if (reason === "clickaway") {
-        return;
-      }
-      setSnackbar({ ...snackbar, open: false });
-    },
-    [snackbar]
-  );
 
   //金額範囲逆転チェック
   const getData = (condition) => {
@@ -280,7 +203,7 @@ const Search = () => {
         sortIndex: condition.sortIndex,
       };
       setAllCondition({ ...conditions });
-      if (itErr) {
+      if (itsErr) {
         setSnackbar({ open: true, severity: "error", message: err });
         return;
       }
@@ -289,35 +212,9 @@ const Search = () => {
       if (length === 0) {
         setSnackbar({ open: true, severity: "warning", message: nodata });
       }
-      const expand = {};
-      //商品情報取得できた場合、それぞれの商品に対する詳細情報の設定をする
-      if (cpErr) {
-        setSnackbar({ open: true, severity: "error", message: err });
-        return;
-      }
-      for (let i = 0; i < length; i++) {
-        const res = result[i];
-        const compares = selectCompares(res.id);
-        res.compares = compares.join(",");
-        expand[res.id] = false;
-        const qtyDom = document.getElementById(`${res.id}_qtyInput`);
-        if (qtyDom !== null) qtyDom.value = 1;
-        const costDom = document.getElementById(`${res.id}_costInput`);
-        if (costDom !== null) costDom.value = +res.budget;
-      }
-      setResultData([...result]);
-      setExpanded({ ...expand });
-      handleChange();
-    }
-  };
 
-  //検索結果詳細情報の開閉状態
-  const [expanded, setExpanded] = useState({});
-  //検索結果詳細情報の開閉処理
-  const handleExpandClick = (id) => {
-    const tmp = expanded;
-    tmp[id] = !expanded[id];
-    setExpanded({ ...tmp });
+      setResultData([...result]);
+    }
   };
 
   //検索条件クリア処理
@@ -325,158 +222,15 @@ const Search = () => {
     reset(defaultValues);
   };
 
-  //編集アイコン押下
-  const handleEdit = async (data) => {
-    const id = data.id;
-    let response;
-    //最新の商品情報を取得する
-    await readItemData(false, id).then((res) => {
-      if (res === [] || res === "error") {
-        handleSnackbar(error, "error");
-        return;
-      }
-      //商品が、削除、購入、キャンセル状態の場合は警告を表示し、処理を中断する
-      if (res.record?.decideDate || res.delete === true) {
-        handleSnackbar(change, "warning");
-        return;
-      }
-      response = res;
-    });
-    if (!response) return;
-    let compares;
-    //最新の比較情報を取得
-    await fetchCompareData(id).then((res) => {
-      if (res === "error") {
-        handleSnackbar(error, "error");
-        return;
-      }
-      compares = res;
-    });
-    if (!compares) return;
-    const compareArr = [];
-    //比較情報に対応する商品名を取得(セレクトボックス初期値のため
-    for (let i = 0; i < compares.length; i++) {
-      const id = compares[i];
-      await readItemData(false, id).then((res) => {
-        if (res === "error") {
-          handleSnackbar(error, "error");
-          return;
-        }
-        compareArr.push({ value: id, label: `${id}:${res.name}` });
-      });
-    }
-    if (compares.length !== compareArr.length) return;
-    response.compares = compareArr;
-    //検索条件と取得した情報をパラメータとして編集画面に遷移する
-    history.push("/edit", {
-      condition: allCondition,
-      itemInfo: response,
-    });
-  };
-
-  //削除処理
-  const handleDelete = async (data) => {
-    const id = data.id;
-    //商品情報を論理削除し、画面から消去する
-    await deleteItemData(data).then((res) => {
-      if (res === [] || res === "error") {
-        handleSnackbar(error, "error");
-        return;
-      }
-      if (res === "warning") {
-        handleSnackbar(change, "warning");
-        return;
-      }
-      const dom = document.getElementById(id);
-      dom.style.display = "none";
-      handleSnackbar(drop, "success");
-    });
-  };
-
-  //購入処理
-  const handlePurchase = async (elm, idx) => {
-    const qty = inputQtyRef.current[idx].value;
-    const cost = inputCostRef.current[idx].value;
-    const id = elm.id;
-    let costValid = true;
-    //単価と数量のエラーチェック
-    await BaseYup.number()
-      .required()
-      .integer()
-      .min(0)
-      .max(99999999)
-      .label("単価")
-      .validate(cost)
-      .catch((res) => {
-        costValid = false;
-        const dom = document.getElementById(`${id}_cost`);
-        dom.textContent = res.errors;
-      });
-    let qtyValid = true;
-    await BaseYup.number()
-      .required()
-      .integer()
-      .positive()
-      .max(999)
-      .label("数量")
-      .validate(qty)
-      .catch((res) => {
-        qtyValid = false;
-        const dom = document.getElementById(`${id}_qty`);
-        dom.textContent = res.errors;
-      });
-    if (!(qtyValid && costValid)) return;
-    elm.record.qty = qty;
-    elm.record.cost = cost;
-    //商品情報更新
-    await updateItemData(elm, "decide").then((res) => {
-      if (res === [] || res === "error") {
-        handleSnackbar(error, "error");
-        return;
-      }
-      //商品が更新、削除されていた場合は警告を表示し処理を終了する
-      if (res === "warning") {
-        handleSnackbar(change, "warning");
-        return;
-      }
-      //商品情報更新後、検索結果で非表示とする
-      const dom = document.getElementById(elm.id);
-      dom.style.display = "none";
-      handleSnackbar(purchase, "success");
-    });
-  };
-
-  //キャンセル処理
-  const handleCancel = async (elm) => {
-    await updateItemData(elm, "decide").then((res) => {
-      if (res === [] || res === "error") {
-        handleSnackbar(error, "error");
-        return;
-      }
-      //商品が更新、削除されていた場合は警告を表示し処理を終了する
-      if (res === "warning") {
-        handleSnackbar(change, "warning");
-        return;
-      }
-      //商品情報更新後、検索結果で非表示とする
-      const dom = document.getElementById(elm.id);
-      dom.style.display = "none";
-      handleSnackbar(cancel, "success");
-    });
-  };
-
   return (
     <GenericTemplate title="検索">
-      <Snackbar
-        open={open}
-        autoHideDuration={4000}
-        onClose={handleClose}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      >
-        <Alert onClose={handleClose} severity={snackbar.color}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+      <CustomizedSnackbars
+        open={snackbar.open}
+        handleClose={handleClose}
+        severity={snackbar.severity}
+        message={snackbar.message}
+      />
+
       <form
         style={{ width: 650 }}
         onSubmit={handleSubmit((data) => getData(data))}
@@ -622,125 +376,16 @@ const Search = () => {
         <hr />
       </form>
       <div id="result">
-        {resultData.map((elm, idx) => (
-          <Card
-            id={elm.id}
+        {itsLoaging && <CircularIndeterminate component="div" />}
+        {resultData?.map((elm) => (
+          <SimpleAccordion
             key={elm.id}
-            className={classes.card}
-            component="span"
-          >
-            <CardHeader
-              avatar={<Avatar className={classes.avatar}>{elm.id}</Avatar>}
-              title={elm.name}
-            />
-            <CardContent>
-              <Typography component="div" variant="body2" color="textSecondary">
-                <label> 単価*:</label>
-                <TextField
-                  id={`${elm.id}_costInput`}
-                  style={{ width: 80 }}
-                  type="number"
-                  inputRef={(el) => (inputCostRef.current[idx] = el)}
-                  defaultValue={elm.budget}
-                  onChange={() => handleChange(`${elm.id}_cost`)}
-                  InputLabelProps={{
-                    shrink: true,
-                  }}
-                />
-                円<p id={`${elm.id}_cost`} className="error"></p>
-              </Typography>
-              <Typography component="div" variant="body2" color="textSecondary">
-                <label> 数量*:</label>
-                <TextField
-                  id={`${elm.id}_qtyInput`}
-                  style={{ width: 80 }}
-                  type="number"
-                  inputRef={(el) => (inputQtyRef.current[idx] = el)}
-                  defaultValue={1}
-                  onChange={() => handleChange(`${elm.id}_qty`)}
-                  InputLabelProps={{
-                    shrink: true,
-                  }}
-                />
-                <p id={`${elm.id}_qty`} className="error"></p>
-              </Typography>
-              <Typography component="div" variant="body2" color="textSecondary">
-                <Button
-                  className={classes.button}
-                  onClick={() => {
-                    handlePurchase(elm, idx);
-                  }}
-                  size="small"
-                  variant="outlined"
-                  color="primary"
-                >
-                  購入
-                </Button>
-                <Button
-                  className={classes.button}
-                  onClick={() => {
-                    handleCancel(elm);
-                  }}
-                  size="small"
-                  variant="outlined"
-                >
-                  キャンセル
-                </Button>
-              </Typography>
-            </CardContent>
-            <CardActions disableSpacing>
-              <IconButton aria-label="編集" onClick={() => handleEdit(elm)}>
-                <EditOutlinedIcon />
-              </IconButton>
-              <IconButton aria-label="削除" onClick={() => handleDelete(elm)}>
-                <DeleteForeverOutlinedIcon />
-              </IconButton>
-              <IconButton
-                className={clsx(classes.expand, {
-                  [classes.expandOpen]: expanded[elm.id],
-                })}
-                onClick={() => handleExpandClick(elm.id)}
-                aria-expanded={expanded[elm.id]}
-                aria-label="詳細"
-              >
-                <ExpandMoreIcon />
-              </IconButton>
-            </CardActions>
-            <Collapse
-              in={expanded[elm.id]}
-              timeout="auto"
-              className={classes.collapse}
-              unmountOnExit
-            >
-              <CardContent>
-                <Typography component="div" paragraph>
-                  購入希望日：{elm.limit?.split("T")[0]}
-                </Typography>
-                <Typography component="div" paragraph>
-                  必要性：{elm.level}%
-                </Typography>
-                <Typography component="div" paragraph>
-                  比較商品：{elm.compares}
-                </Typography>
-                <Typography component="div" paragraph>
-                  リンク
-                </Typography>
-                <Typography component="div" paragraph>
-                  <a href={elm.url}>{elm.url}</a>
-                </Typography>
-                <Typography component="div" paragraph>
-                  メモ
-                </Typography>
-                <Typography
-                  style={{ border: "solid 0.5px" }}
-                  component="div"
-                  paragraph
-                >
-                  {elm.remark}
-                </Typography>
-              </CardContent>
-            </Collapse>
-          </Card>
+            elm={elm}
+            allCondition={allCondition}
+            setActionErr={() => {
+              setActionErr(true);
+            }}
+          />
         ))}
       </div>
     </GenericTemplate>

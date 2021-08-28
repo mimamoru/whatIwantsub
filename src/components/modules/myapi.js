@@ -32,7 +32,7 @@ export const selectDatas = async (type = "", param ="" ) => {
   const url = getUrl(type);
   //`${url}?_page=${page}&_limit=10`;
   //?title=json-server&author=typicode
-  const path = `${url}?${param}`;
+  const path = `${url}${param}`;
   const { data } = await axios.get(path);
   return data;
 };

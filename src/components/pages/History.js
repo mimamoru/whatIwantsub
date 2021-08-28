@@ -1,4 +1,4 @@
-import { React, useState, useEffect } from "react";
+import { React, useState, useEffect, useCallback } from "react";
 import GenericTemplate from "../modules/GenericTemplate";
 import { makeStyles } from "@material-ui/core/styles";
 import { DataGrid } from "@material-ui/data-grid";
@@ -7,12 +7,12 @@ import Tabs from "@material-ui/core/Tabs";
 import Tab from "@material-ui/core/Tab";
 import Typography from "@material-ui/core/Typography";
 import Box from "@material-ui/core/Box";
-
-import ShoppingCartIcon from "@material-ui/icons/ShoppingCart"; //買った
-import BlockOutlinedIcon from "@material-ui/icons/BlockOutlined"; //やめた
+import CustomizedSnackbars from "../atoms/CustomizedSnackbars";
+import ShoppingCartIcon from "@material-ui/icons/ShoppingCart";
+import BlockOutlinedIcon from "@material-ui/icons/BlockOutlined";
 import ReactSelect from "react-select";
-import { readItemData, getCurrentDate } from "../modules/dataManage";
-
+import { err } from "../modules/messages";
+import { useSelectDatas, getCurrentDate } from "../queryhooks";
 const useStyles = makeStyles((theme) => ({
   absolute: {
     position: "absolute",
@@ -77,43 +77,83 @@ const History = () => {
   const [buyHistoryRows, setBuyHistoryRows] = useState([]);
   const [cancelHistoryRows, setCancelHistoryRows] = useState([]);
 
+  //商品情報取得hook(複数)
+  const [
+    { data: items, isLoading: itsLoaging, isError: itsErr },
+    setItCondition,
+  ] = useSelectDatas();
+
+  //商品情報取得(複数)
   useEffect(() => {
-    const fetchData = async () => {
-      await readItemData(false).then((res) => {
-        if (res === "error") {
-        }
-        if (tabValue === 0) {
-          const buyHistoryInfo = res
-            ? res.filter((e) => e.record.qty !== null)
-            : [];
-          const rows = buyHistoryInfo.map((e) => ({
-            id: e.id,
-            name: e.name,
-            registerDate: e.record.decideDate.split(" ")[0],
-            cost: e.record.cost,
-            qty: e.record.qty,
-            totalCost: e.record.cost * e.record.qty,
-          }));
-          setBuyHistory([...rows]);
-          setBuyHistoryRows([...rows]);
-        } else {
-          const cancelHistoryInfo = res
-            ? res.filter(
-                (e) => e.record.decideDate !== null && e.record.qty == null
-              )
-            : [];
-          const rows = cancelHistoryInfo.map((e) => ({
-            id: e.id,
-            name: e.name,
-            registerDate: e.record.decideDate,
-          }));
-          setCancelHistory([...rows]);
-          setCancelHistoryRows([...rows]);
-        }
+    const fetch = () => {
+      setItCondition({
+        type: "item",
+        param: "&delete=false&record.decideDate=null",
       });
     };
+    fetch();
+  }, [setItCondition]);
+
+  //スナックバーの状態管理
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    severity: "",
+    message: "",
+  });
+
+  //スナックバーを閉じる処理
+  const handleClose = useCallback(
+    (event, reason) => {
+      if (reason === "clickaway") {
+        return;
+      }
+      setSnackbar({ ...snackbar, open: false });
+    },
+    [snackbar]
+  );
+
+  useEffect(() => {
+    const fetchData = () => {
+      if (itsLoaging) return;
+      if (itsErr) {
+        setItCondition({
+          type: "item",
+          param: "&delete=false&record.decideDate=null",
+        });
+        setSnackbar({ open: true, severity: "error", message: err });
+        return;
+      }
+      if (tabValue === 0) {
+        const buyHistoryInfo = items
+          ? items.filter((e) => e.record.qty !== null)
+          : [];
+        const rows = buyHistoryInfo.map((e) => ({
+          id: e.id,
+          name: e.name,
+          registerDate: e.record.decideDate.split(" ")[0],
+          cost: e.record.cost,
+          qty: e.record.qty,
+          totalCost: e.record.cost * e.record.qty,
+        }));
+        setBuyHistory([...rows]);
+        setBuyHistoryRows([...rows]);
+      } else {
+        const cancelHistoryInfo = items
+          ? items.filter(
+              (e) => e.record.decideDate !== null && e.record.qty == null
+            )
+          : [];
+        const rows = cancelHistoryInfo.map((e) => ({
+          id: e.id,
+          name: e.name,
+          registerDate: e.record.decideDate,
+        }));
+        setCancelHistory([...rows]);
+        setCancelHistoryRows([...rows]);
+      }
+    };
     fetchData();
-  }, [tabValue]);
+  }, [tabValue, items, itsErr, itsLoaging, setItCondition]);
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
@@ -145,6 +185,12 @@ const History = () => {
   return (
     <GenericTemplate title="履歴">
       <div id="wrapper">
+        <CustomizedSnackbars
+          open={snackbar.open}
+          handleClose={handleClose}
+          severity={snackbar.severity}
+          message={snackbar.message}
+        />
         <Paper className={classes.root}>
           <Tabs
             value={tabValue}

@@ -1,25 +1,22 @@
-import { React, useState, useEffect } from "react";
+import { React, useState, useEffect, useCallback } from "react";
 
 import { useForm, Controller } from "react-hook-form";
 
 import ReactSelect from "react-select";
-import Snackbar from "@material-ui/core/Snackbar";
-import MuiAlert from "@material-ui/lab/Alert";
+
 import Button from "@material-ui/core/Button";
 import TextField from "@material-ui/core/TextField";
 import Slider from "@material-ui/core/Slider";
 
 import { yupResolver } from "@hookform/resolvers/yup";
 import { BaseYup } from "../modules/localeJP";
+import CustomizedSnackbars from "../atoms/CustomizedSnackbars";
 
+import CircularIndeterminate from "../atoms/CircularIndeterminate";
 import GenericTemplate from "../modules/GenericTemplate";
-import {
-  readItemData,
-  addItemData,
-  addCompareData,
-  getCurrentDate,
-} from "../modules/dataManage";
-import { error, register } from "../modules/messages";
+
+import { useSelectDatas, usePostData, getCurrentDate } from "../queryhooks";
+import { err, register } from "../modules/messages";
 
 //バリデーションの指定
 const schema = BaseYup.object().shape({
@@ -62,10 +59,9 @@ const valuetext = (value) => {
   return `${value}%`;
 };
 
-//登録処理
-const fetchPost = async (data) => {
-  let response;
-  const itemInfo = {
+//登録データ
+const postData = (data) => {
+  const postItemData = {
     id: null,
     name: data.itemName,
     budget: data.budget,
@@ -82,28 +78,16 @@ const fetchPost = async (data) => {
       recordDate: null,
     },
   };
-  let items = [];
+  let postCompareData = [];
   data.compares &&
     data.compares.forEach((e) => {
-      e && items.push(e.value);
+      e && postCompareData.push(e.value);
     });
-  items = items.sort();
-  //商品情報登録
-  await addItemData(itemInfo).then((res) => {
-    if (res === "error") {
-      return;
-    }
-    response = res;
-  });
-  if (!response) return "error";
-  let result = "success";
-  //比較情報登録
-  await addCompareData(response, ...items).then((res) => {
-    if (res === "error") {
-      result = "error";
-    }
-  });
-  return result;
+  postCompareData = postCompareData.sort();
+  return {
+    postItemData: postItemData,
+    postCompareData: postCompareData,
+  };
 };
 
 const Register = () => {
@@ -116,79 +100,94 @@ const Register = () => {
     defaultValues: defaultValues,
     resolver: yupResolver(schema),
   });
+  //商品登録hook
+  const [{ isLoading: itPLoaging, isError: itPErr }, setItData] = usePostData();
+  //比較情報登録hook
+  const [{ isLoading: cpPLoaging, isError: cPErr }, setCpData] = usePostData();
+  //商品情報取得hook(複数)
+  const [
+    { data: items, isLoading: itsLoaging, isError: itsErr },
+    setItCondition,
+  ] = useSelectDatas();
 
-  //スナックバー表示状態
-  const [open, setOpen] = useState(false);
-  //スナックバー内容状態
-  const [snackbar, setSnackbar] = useState({ message: "", color: "" });
+  //商品情報取得(複数)
+  useEffect(() => {
+    const fetch = () => {
+      setItCondition({
+        type: "item",
+        param: "&delete=false&record.decideDate=null",
+      });
+    };
+    fetch();
+  }, [setItCondition]);
+  //スナックバーの状態管理
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    severity: "",
+    message: "",
+  });
+
   //スナックバーを閉じる処理
-  const handleClose = (event, reason) => {
-    if (reason === "clickaway") {
-      return;
-    }
-    setOpen(false);
-  };
-  function Alert(props) {
-    return <MuiAlert elevation={6} variant="filled" {...props} />;
-  }
-  //スナックバー表示処理
-  const handleSnackbar = (message, color) => {
-    setSnackbar({ message: message, color: color });
-    setOpen(true);
-  };
+  const handleClose = useCallback(
+    (event, reason) => {
+      if (reason === "clickaway") {
+        return;
+      }
+      setSnackbar({ ...snackbar, open: false });
+    },
+    [snackbar]
+  );
 
   //セレクトボックスのプルダウンメニュー管理
   const [options, setOptions] = useState([]);
   //セレクトボックスのプルダウンメニューを設定
   useEffect(() => {
-    const fetchItemData = async () => {
-      let response;
-      await readItemData(false).then((res) => {
-        if (res === "error") {
-          setSnackbar({ message: error, color: "error" });
-          setOpen(true);
-          return;
-        }
-        response = res;
+    if (itsLoaging) return;
+    if (itsErr) {
+      setItCondition({
+        type: "item",
+        param: "&delete=false&record.decideDate=null",
       });
-      if (!response) return;
-      const options = response
-        .filter((e) => e.record.decideDate === null)
-        .map((e) => ({ value: e.id, label: `${e.id}:${e.name}` }));
-      setOptions(options);
-    };
-    fetchItemData();
-  }, [open]);
+      setSnackbar({ open: true, severity: "error", message: err });
+      return;
+    }
+    const option = items.map((e) => ({
+      value: e.id,
+      label: `${e.id}:${e.name}`,
+    }));
+    setOptions(...option);
+  }, [itsLoaging, itsErr, setItCondition, items]);
 
-  //登録処理　結果に応じたスナックバーを表示
+  //登録処理
   async function handleRegister(data) {
-    await fetchPost(data).then((res) => {
-      if (res === "error") {
-        handleSnackbar(error, "error");
-        return;
-      }
-      reset(defaultValues);
-      handleSnackbar(register, "success");
-    });
+    const { postItemData, postCompareData } = postData(data);
+    setItData(...{ type: "item", data: postItemData });
+    if (itsErr) {
+      setSnackbar({ open: true, severity: "error", message: err });
+      return;
+    }
+    setCpData(...{ type: "compare", data: postCompareData });
+    if (cPErr) {
+      setSnackbar({ open: true, severity: "error", message: err });
+      return;
+    }
+    setSnackbar({ open: true, severity: "success", message: register });
   }
 
   return (
     <GenericTemplate title="登録">
-      <Snackbar
-        open={open}
-        autoHideDuration={4000}
-        onClose={handleClose}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      >
-        <Alert onClose={handleClose} severity={snackbar.color}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+      <CustomizedSnackbars
+        open={snackbar.open}
+        handleClose={handleClose}
+        severity={snackbar.severity}
+        message={snackbar.message}
+      />
       <form
         style={{ width: 650 }}
         onSubmit={handleSubmit((data) => handleRegister(data))}
         className="form"
       >
+        {itPLoaging && <CircularIndeterminate component="div" />}
         <hr />
         <div className="container">
           <section>
